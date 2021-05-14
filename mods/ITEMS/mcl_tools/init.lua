@@ -233,7 +233,7 @@ if minetest.get_modpath("mcl_farming") then
 				local wear = mcl_autogroup.get_wear(toolname, "shearsy")
 				itemstack:add_wear(wear)
 			end
-			minetest.sound_play({name="default_grass_footstep", gain=1}, {pos = above}, true)
+			minetest.sound_play({name="default_grass_footstep", gain=1}, {pos = pointed_thing.above}, true)
 			local dir = vector.subtract(pointed_thing.under, pointed_thing.above)
 			local param2 = minetest.dir_to_facedir(dir)
 			minetest.swap_node(pointed_thing.under, {name="mcl_farming:pumpkin_face", param2 = param2})
@@ -352,6 +352,34 @@ minetest.register_tool("mcl_tools:shovel_diamond", {
 })
 
 -- Axes
+local make_stripped_trunk = function(itemstack, placer, pointed_thing)
+    if pointed_thing.type ~= "node" then return end
+
+    local node = minetest.get_node(pointed_thing.under)
+    local noddef = minetest.registered_nodes[minetest.get_node(pointed_thing.under).name]
+
+    if not placer:get_player_control().sneak and noddef.on_rightclick then
+        return minetest.item_place(itemstack, placer, pointed_thing)
+    end
+    if minetest.is_protected(pointed_thing.under, placer:get_player_name()) then
+        minetest.record_protection_violation(pointed_thing.under, placer:get_player_name())
+        return itemstack
+    end
+
+    if noddef._mcl_stripped_varient == nil then
+		return itemstack
+	else
+		minetest.swap_node(pointed_thing.under, {name=noddef._mcl_stripped_varient, param2=node.param2})
+		if not minetest.is_creative_enabled(placer:get_player_name()) then
+			-- Add wear (as if digging a axey node)
+			local toolname = itemstack:get_name()
+			local wear = mcl_autogroup.get_wear(toolname, "axey")
+			itemstack:add_wear(wear)
+		end
+	end
+    return itemstack
+end
+
 minetest.register_tool("mcl_tools:axe_wood", {
 	description = S("Wooden Axe"),
 	_doc_items_longdesc = axe_longdesc,
@@ -365,6 +393,7 @@ minetest.register_tool("mcl_tools:axe_wood", {
 		damage_groups = {fleshy=7},
 		punch_attack_uses = 30,
 	},
+	on_place = make_stripped_trunk,
 	sound = { breaks = "default_tool_breaks" },
 	_repair_material = "group:wood",
 	_mcl_toollike_wield = true,
@@ -384,6 +413,7 @@ minetest.register_tool("mcl_tools:axe_stone", {
 		damage_groups = {fleshy=9},
 		punch_attack_uses = 66,
 	},
+	on_place = make_stripped_trunk,
 	sound = { breaks = "default_tool_breaks" },
 	_repair_material = "mcl_core:cobble",
 	_mcl_toollike_wield = true,
@@ -404,6 +434,7 @@ minetest.register_tool("mcl_tools:axe_iron", {
 		damage_groups = {fleshy=9},
 		punch_attack_uses = 126,
 	},
+	on_place = make_stripped_trunk,
 	sound = { breaks = "default_tool_breaks" },
 	_repair_material = "mcl_core:iron_ingot",
 	_mcl_toollike_wield = true,
@@ -423,6 +454,7 @@ minetest.register_tool("mcl_tools:axe_gold", {
 		damage_groups = {fleshy=7},
 		punch_attack_uses = 17,
 	},
+	on_place = make_stripped_trunk,
 	sound = { breaks = "default_tool_breaks" },
 	_repair_material = "mcl_core:gold_ingot",
 	_mcl_toollike_wield = true,
@@ -442,6 +474,7 @@ minetest.register_tool("mcl_tools:axe_diamond", {
 		damage_groups = {fleshy=9},
 		punch_attack_uses = 781,
 	},
+	on_place = make_stripped_trunk,
 	sound = { breaks = "default_tool_breaks" },
 	_repair_material = "mcl_core:diamond",
 	_mcl_toollike_wield = true,

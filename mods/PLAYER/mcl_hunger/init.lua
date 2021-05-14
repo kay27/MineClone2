@@ -1,5 +1,4 @@
 local S = minetest.get_translator("mcl_hunger")
-local mod_death_messages = minetest.get_modpath("mcl_death_messages")
 
 mcl_hunger = {}
 
@@ -65,9 +64,7 @@ end
 -- Count number of poisonings a player has at once
 mcl_hunger.poison_hunger = {} -- food poisoning, increasing hunger
 
--- HUD item ids
-local hunger_hud = {}
-
+-- HUD
 local function init_hud(player)
 	hb.init_hudbar(player, "hunger", mcl_hunger.get_hunger(player))
 	if mcl_hunger.debug then
@@ -140,14 +137,14 @@ local timerMult = 1	-- Cycles from 0 to 7, each time when timer hits half a seco
 minetest.register_globalstep(function(dtime)
 	main_timer = main_timer + dtime
 	timer = timer + dtime
-	if main_timer > mcl_hunger.HUD_TICK or timer > 0.5 then
+	if main_timer > mcl_hunger.HUD_TICK or timer > 0.25 then
 		if main_timer > mcl_hunger.HUD_TICK then main_timer = 0 end
 		for _,player in pairs(minetest.get_connected_players()) do
 		local name = player:get_player_name()
 
 		local h = tonumber(mcl_hunger.get_hunger(player))
 		local hp = player:get_hp()
-		if timer > 0.5 then
+		if timer > 0.25 then
 			-- Slow health regeneration, and hunger damage (every 4s).
 			-- Regeneration rate based on tutorial video <https://www.youtube.com/watch?v=zs2t-xCVHBo>.
 			-- Minecraft Wiki seems to be wrong in claiming that full hunger gives 0.5s regen rate.
@@ -161,10 +158,7 @@ minetest.register_globalstep(function(dtime)
 				-- Damage hungry player down to 1 HP
 				-- TODO: Allow starvation at higher difficulty levels
 					if hp-1 > 0 then
-						if mod_death_messages then
-							mcl_death_messages.player_damage(player, S("@1 starved to death.", name))
-						end
-						player:set_hp(hp-1)
+						mcl_util.deal_damage(player, 1, {type = "starve"})
 					end
 				end
 			end
@@ -172,9 +166,9 @@ minetest.register_globalstep(function(dtime)
 		end
 		end
 	end
-	if timer > 0.5 then
+	if timer > 0.25 then
 		timer = 0
-		timerMult = timerMult + 1
+		timerMult = timerMult + 2
 		if timerMult > 7 then
 			timerMult = 0
 		end

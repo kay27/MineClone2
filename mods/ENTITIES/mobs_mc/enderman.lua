@@ -190,20 +190,22 @@ end
 local mobs_griefing = minetest.settings:get_bool("mobs_griefing") ~= false
 
 mobs:register_mob("mobs_mc:enderman", {
+	description = S("Enderman"),
 	type = "monster",
 	spawn_class = "passive",
-	passive = true,
-	pathfinding = 1,
+	neutral = true,
 	hp_min = 40,
 	hp_max = 40,
 	xp_min = 5,
 	xp_max = 5,
+	rotate = 270,
 	collisionbox = {-0.3, -0.01, -0.3, 0.3, 2.89, 0.3},
 	visual = "mesh",
 	mesh = "mobs_mc_enderman.b3d",
 	textures = create_enderman_textures(),
 	visual_size = {x=3, y=3},
 	makes_footstep_sound = true,
+	eye_height = 2.5,
 	sounds = {
 		-- TODO: Custom war cry sound
 		war_cry = "mobs_sandmonster",
@@ -212,8 +214,8 @@ mobs:register_mob("mobs_mc:enderman", {
 		random = {name="mobs_mc_enderman_random", gain=0.5},
 		distance = 16,
 	},
-	walk_velocity = 0.2,
-	run_velocity = 3.4,
+	walk_velocity = 1,
+	run_velocity = 4,
 	damage = 7,
 	reach = 2,
 	drops = {
@@ -223,6 +225,22 @@ mobs:register_mob("mobs_mc:enderman", {
 		max = 1,
 		looting = "common"},
 	},
+
+	--head code
+	has_head = false,
+	head_bone = "head.low",
+
+	swap_y_with_x = false,
+	reverse_head_yaw = false,
+
+	head_bone_pos_y = 2.4,
+	head_bone_pos_z = 0,
+
+	head_height_offset = 1.1,
+	head_direction_offset = 0,
+	head_pitch_modifier = 0,
+	--end head code
+
 	animation = select_enderman_animation("normal"),
 	_taken_node = "",
 	do_custom = function(self, dtime)
@@ -281,8 +299,8 @@ mobs:register_mob("mobs_mc:enderman", {
 				--self:teleport(nil)
 				--self.state = ""
 			--else
-				if self.attack then
-					local target = self.attack
+				if self.attacking then
+					local target = self.attacking
 					local pos = target:get_pos()
 					if pos ~= nil then
 						if vector.distance(self.object:get_pos(), target:get_pos()) > 10 then
@@ -323,14 +341,14 @@ mobs:register_mob("mobs_mc:enderman", {
 			--	self:teleport(nil)
 			--	self.state = ""
 			--else
-				if self.attack ~= nil then
+				if self.attack ~= nil and not minetest.settings:get_bool("creative_mode") then
 					self.state = 'attack'
 				end
 			--end
 		end
 		-- Check to see if people are near by enough to look at us.
 		for _,obj in pairs(minetest.get_connected_players()) do
-			
+
 			--check if they are within radius
 			local player_pos = obj:get_pos()
 			if player_pos then -- prevent crashing in 1 in a million scenario
@@ -346,29 +364,33 @@ mobs:register_mob("mobs_mc:enderman", {
 					--skip player if they have no data - log it
 					if not player_eye_height then
 						minetest.log("error", "Enderman at location: ".. dump(enderpos).." has indexed a null player!")
-						goto continue
-					end
+					else
 
-					--calculate very quickly the exact location the player is looking
-					--within the distance between the two "heads" (player and enderman)
-					local look_pos = vector.new(player_pos.x, player_pos.y + player_eye_height, player_pos.z)
-					local look_pos_base = look_pos
-					local ender_eye_pos = vector.new(enderpos.x, enderpos.y + 2.75, enderpos.z)
-					local eye_distance_from_player = vector.distance(ender_eye_pos, look_pos)
-					look_pos = vector.add(look_pos, vector.multiply(look_dir, eye_distance_from_player))
-					
-					--if looking in general head position, turn hostile
-					if minetest.line_of_sight(ender_eye_pos, look_pos_base) and vector.distance(look_pos, ender_eye_pos) <= 0.4 then
-						self.provoked = "staring"
-						self.attack = minetest.get_player_by_name(obj:get_player_name())
-						break
-					else -- I'm not sure what this part does, but I don't want to break anything - jordan4ibanez
-						if self.provoked == "staring" then
-							self.provoked = "broke_contact"
-						end						
-					end
+						--calculate very quickly the exact location the player is looking
+						--within the distance between the two "heads" (player and enderman)
+						local look_pos = vector.new(player_pos.x, player_pos.y + player_eye_height, player_pos.z)
+						local look_pos_base = look_pos
+						local ender_eye_pos = vector.new(enderpos.x, enderpos.y + 2.75, enderpos.z)
+						local eye_distance_from_player = vector.distance(ender_eye_pos, look_pos)
+						look_pos = vector.add(look_pos, vector.multiply(look_dir, eye_distance_from_player))
 
-					::continue:: -- this is a sweep over statement, this can be used to continue even when errors occurred
+						--if looking in general head position, turn hostile
+						if minetest.line_of_sight(ender_eye_pos, look_pos_base) and vector.distance(look_pos, ender_eye_pos) <= 0.4 then
+							self.provoked = "staring"
+							self.state = "stand"
+							self.hostile = false
+							break
+						--begin attacking the player
+						else
+							if self.provoked == "staring" then
+								self.provoked = "broke_contact"
+								self.hostile = true
+								self.state = "attack"
+								self.attacking = obj
+							end
+						end
+
+					end
 				end
 			end
 		end
@@ -430,7 +452,7 @@ mobs:register_mob("mobs_mc:enderman", {
 						self.base_texture = create_enderman_textures(block_type, self._taken_node)
 						self.object:set_properties({ textures = self.base_texture })
 						self.animation = select_enderman_animation("block")
-						mobs:set_animation(self, self.animation.current)
+						mobs.set_mob_animation(self, self.animation.current)
 						if def.sounds and def.sounds.dug then
 							minetest.sound_play(def.sounds.dug, {pos = take_pos, max_hear_distance = 16}, true)
 						end
@@ -453,7 +475,7 @@ mobs:register_mob("mobs_mc:enderman", {
 					local def = minetest.registered_nodes[self._taken_node]
 					-- Update animation accordingly (removes visible block)
 					self.animation = select_enderman_animation("normal")
-					mobs:set_animation(self, self.animation.current)
+					mobs.set_mob_animation(self, self.animation.current)
 					if def.sounds and def.sounds.place then
 						minetest.sound_play(def.sounds.place, {pos = place_pos, max_hear_distance = 16}, true)
 					end
@@ -557,29 +579,29 @@ mobs:register_mob("mobs_mc:enderman", {
 	water_damage = 8,
 	view_range = 64,
 	fear_height = 4,
-	attack_type = "dogfight",
+	attack_type = "punch",
 })
 
 
 -- End spawn
 mobs:spawn_specific(
-"mobs_mc:enderman", 
-"end", 
+"mobs_mc:enderman",
+"end",
 "ground",
 {
 "End"
 },
-0, 
-minetest.LIGHT_MAX+1, 
-30, 
-3000, 
-12, 
-mobs_mc.spawn_height.end_min, 
+0,
+minetest.LIGHT_MAX+1,
+30,
+3000,
+12,
+mobs_mc.spawn_height.end_min,
 mobs_mc.spawn_height.end_max)
 -- Overworld spawn
 mobs:spawn_specific(
-"mobs_mc:enderman", 
-"overworld", 
+"mobs_mc:enderman",
+"overworld",
 "ground",
 {
 "Mesa",
@@ -722,28 +744,28 @@ mobs:spawn_specific(
 "ExtremeHillsM_underground",
 "JungleEdgeM_underground",
 },
-0, 
-7, 
-30, 
-19000, 
-2, 
-mobs_mc.spawn_height.overworld_min, 
+0,
+7,
+30,
+19000,
+2,
+mobs_mc.spawn_height.overworld_min,
 mobs_mc.spawn_height.overworld_max)
 
 -- Nether spawn (rare)
 mobs:spawn_specific(
-"mobs_mc:enderman", 
-"nether", 
+"mobs_mc:enderman",
+"nether",
 "ground",
 {
 "Nether"
 },
-0, 
-7, 
-30, 
-27500, 
-4, 
-mobs_mc.spawn_height.nether_min, 
+0,
+7,
+30,
+27500,
+4,
+mobs_mc.spawn_height.nether_min,
 mobs_mc.spawn_height.nether_max)
 
 -- spawn eggs
